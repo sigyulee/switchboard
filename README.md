@@ -20,12 +20,15 @@ Recorded-call replay with Korean subtitles.
 - Control recording and transcription independently.
 - Separate caller and Agent waveforms and listening levels.
 - Live transcripts with translations beneath the original text.
+- Context-aware translation and saved-recording transcription and translation.
 - Recording playback, search, and timestamp navigation.
 - Recording dates and missing-audio interval details.
 - Complete session-file export, including audio and conversation text.
 - M4A, separate-source WAV, and transcript TXT exports.
 - Headphone monitoring with optional built-in speaker fallback.
-- English and Korean interfaces with adjustable text size.
+- English and Korean interfaces that follow macOS text and appearance settings.
+- VoiceOver, keyboard navigation, non-color status cues, and macOS contrast, motion, and
+  transparency preferences.
 
 ## Requirements
 
@@ -37,7 +40,15 @@ Recorded-call replay with Korean subtitles.
 Transcription and translation languages depend on the models available on your
 Mac. Download missing models from the language controls in the session.
 
+On macOS 26.4 and later, translation uses recent conversation context. As new
+speech arrives, recent translations may update to reflect that context.
+The original text, speaker, and timestamps stay attached to each entry. Earlier
+supported macOS versions translate entries individually.
+
 ## Build
+
+Use Xcode 26.4 or later to include contextual translation. Xcode 26.0.1 builds
+retain individual-entry translation.
 
 ```sh
 bash scripts/check.sh
@@ -91,10 +102,17 @@ Use **Command-F** in the conversation to find original text or translations; in 
 recording list, it searches recordings. You can change transcript languages during
 a session and select **Start** to continue with the new settings.
 
-Choose **Text size** in Settings to adjust text throughout the app. A `.switchboard`
-session file is a macOS package containing JSON metadata and its audio and text
-files. **Export session file** creates a complete copy of that package. Older
+Text follows the macOS accessibility text-size setting throughout the app.
+
+In **Recordings**, use **Transcribe** for a recording made with Record Only. Existing
+transcripts offer **Transcript actions** to continue incomplete work, transcribe
+again, or translate the saved text into another language. Processing can be paused
+and resumed after restarting the app. Review **Current** and **New result**, then
+choose **Apply** or **Discard**. Processing does not change the original audio.
+
+A `.switchboard` session file is a macOS package containing JSON metadata and its
+audio and text files. **Export session file** creates a complete copy of that package. Older
 `.mihrecording` files remain readable and export as `.switchboard` session files.
 
 See [installation](docs/LOCAL-INSTALL.md), [architecture](docs/ARCHITECTURE.md),
-[testing](docs/TESTING.md), and [versioning](docs/VERSIONING.md).
+[testing](docs/TESTING.md), [versions](docs/VERSIONING.md), and [changelog](CHANGELOG.md).

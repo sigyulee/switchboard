@@ -2,6 +2,7 @@ import AppKit
 import BridgeCore
 import RecorderKit
 import SwiftUI
+import TranscriptKit
 
 struct LibraryView: View {
     @Environment(\.appTypography) private var typography
@@ -26,6 +27,7 @@ struct LibraryView: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(strings(.navigationRecordings)).font(typography.title)
+                        .accessibilityAddTraits(.isHeader)
                     Text("\(model.recordings.count + model.unfinishedSessions.count)")
                         .font(typography.title.weight(.regular).monospacedDigit()).foregroundStyle(.secondary)
                     Spacer()
@@ -33,7 +35,7 @@ struct LibraryView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
                     TextField(strings(.librarySearch), text: $query).textFieldStyle(.plain)
-                        .focused($searchFocused).focusEffectDisabled().accessibilityLabel(
+                        .focused($searchFocused).accessibilityLabel(
                             strings(.librarySearch))
                 }.font(typography.body).padding(10)
                     .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
@@ -74,6 +76,12 @@ struct LibraryView: View {
                 LanguageModelsView(configuration: configuration)
             }
         }
+        .task(id: model.recordings.map(\.id)) {
+            for item in model.recordings {
+                guard !Task.isCancelled else { return }
+                await model.storedProcessing.restore(item)
+            }
+        }
         .task(id: model.recordingSearchRequested) {
             guard model.recordingSearchRequested else { return }
             await Task.yield()
@@ -96,6 +104,7 @@ struct LibraryView: View {
                         duration: Double(draft.manifest.durationFrames) / 48_000,
                         systemImage: "clock.arrow.circlepath", saved: false,
                         selected: draft.manifest.id == selectedID,
+                        focused: listFocused && draft.manifest.id == selectedID,
                         showsSeparator: index + 1 < visibleDrafts.count
                             && draft.manifest.id != selectedID
                             && visibleDrafts[index + 1].manifest.id != selectedID
@@ -122,8 +131,10 @@ struct LibraryView: View {
                         systemImage: item.manifest.status == .complete
                             ? "waveform" : "clock.arrow.circlepath",
                         saved: true, selected: item.id == selectedID,
+                        focused: listFocused && item.id == selectedID,
                         showsSeparator: index + 1 < visibleItems.count && item.id != selectedID
-                            && visibleItems[index + 1].id != selectedID
+                            && visibleItems[index + 1].id != selectedID,
+                        processingPhase: model.storedProcessing.record(for: item)?.phase
                     ) {
                         RecordingInfoButton(item: item)
                     }.tag(item.id)
@@ -206,6 +217,7 @@ struct LibraryView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 Text(item.manifest.title).font(typography.panelTitle).lineLimit(2).help(item.manifest.title)
+                    .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: 12)
                 IconButton("square.and.pencil", label: strings(.libraryRename)) { model.rename(item) }
                     .disabled(!model.canEdit(item) || model.exportBusy || model.libraryMutationTask != nil)
@@ -243,9 +255,11 @@ struct LibraryView: View {
                     }
                 }, processing: model.storedProcessing,
                 canProcess: !model.preview && !model.session.active && !model.starting && !model.endingSession
-                    && model.libraryMutationTask == nil,
-                continueProcessing: model.continueProcessing
-            )
+                    && model.libraryMutationTask == nil && !model.exportBusy,
+                continueProcessing: model.continueProcessing,
+                announcer: model.accessibilityAnnouncer,
+                defaultConfiguration: model.transcript.configuration, startProcessing: model.processStored
+            ).id("\(item.id)-\(item.directory.path)")
             if model.canRecover(item) {
                 HStack {
                     Text(
@@ -289,6 +303,7 @@ struct LibraryView: View {
 
 private struct LibraryRecordingRow<Accessory: View>: View {
     @Environment(\.appTypography) private var typography
+    @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.appStrings) private var strings
     let title: String
     let date: Date
@@ -296,7 +311,9 @@ private struct LibraryRecordingRow<Accessory: View>: View {
     let systemImage: String
     let saved: Bool
     let selected: Bool
+    let focused: Bool
     let showsSeparator: Bool
+    var processingPhase: StoredTranscriptPhase? = nil
     @ViewBuilder var accessory: Accessory
 
     var body: some View {
@@ -310,6 +327,7 @@ private struct LibraryRecordingRow<Accessory: View>: View {
                 HStack(alignment: .top, spacing: 4) {
                     Text(title).font(typography.row).lineLimit(2).help(title)
                         .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 6)
+                        .accessibilityHidden(true)
                     accessory
                 }
                 HStack(alignment: .firstTextBaseline) {
@@ -319,13 +337,35 @@ private struct LibraryRecordingRow<Accessory: View>: View {
                     Spacer(minLength: 8)
                     Text(durationText(duration)).monospacedDigit().fixedSize()
                 }.font(typography.caption).foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
                     // Keep metadata at the content edge while the full-size accessory moves outward.
                     .padding(.trailing, 10)
+                if let processingPhase {
+                    Text(strings(processingPhase.label)).font(typography.caption)
+                        .foregroundStyle(processingPhase == .failed ? Color.red : Color.secondary)
+                        .accessibilityHidden(true)
+                }
             }
         }.padding(.vertical, 10).contentShape(Rectangle())
             .accessibilityElement(children: .contain).accessibilityLabel(title)
-            .overlay(alignment: .bottom) {
-                if showsSeparator { Divider().padding(.leading, 28).padding(.trailing, 10) }
+            .accessibilityValue(
+                RecordingAccessibilitySummary(
+                    date: date.formatted(
+                        Date.FormatStyle(date: .numeric, time: .omitted).locale(strings.locale)),
+                    duration: durationText(duration),
+                    status: processingPhase.map { strings($0.label) }
+                ).value
+            )
+            .overlay {
+                let lineWidth = LibraryRowFocusPresentation.lineWidth(
+                    selected: selected, listFocused: focused, increasedContrast: contrast == .increased)
+                ZStack(alignment: .bottom) {
+                    if showsSeparator { Divider().padding(.leading, 28).padding(.trailing, 10) }
+                    if lineWidth > 0 {
+                        RoundedRectangle(cornerRadius: 8).strokeBorder(
+                            Color.accentColor, lineWidth: lineWidth)
+                    }
+                }
             }
     }
 }

@@ -27,7 +27,7 @@ struct SessionHeading: View {
     }
 
     private var title: some View {
-        Text(name).font(typography.title)
+        Text(name).font(typography.title).accessibilityAddTraits(.isHeader)
     }
 
     private var elapsed: some View {

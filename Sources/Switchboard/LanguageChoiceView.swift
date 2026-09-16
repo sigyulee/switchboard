@@ -8,7 +8,8 @@ struct LanguageChoiceView: View {
     var body: some View {
         VStack(spacing: 28) {
             SwitchboardMark().frame(width: 64, height: 64)
-            Text("Switchboard").font(typography.title)
+            Text("Switchboard").font(typography.title).accessibilityAddTraits(.isHeader)
+                .accessibilityInitialFocus()
             VStack(spacing: 12) {
                 ForEach(ApplicationLanguage.allCases) { language in
                     Button {
@@ -21,7 +22,7 @@ struct LanguageChoiceView: View {
                         }.padding(.horizontal, 16).padding(.vertical, 10)
                     }.buttonStyle(.bordered).controlSize(.large)
                 }
-            }.frame(width: 280)
+            }.frame(minWidth: 280, idealWidth: 340, maxWidth: 440)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .frame(minWidth: 680, minHeight: 620)

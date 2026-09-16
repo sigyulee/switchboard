@@ -16,7 +16,7 @@ struct SessionHomeView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
             VStack(alignment: .leading, spacing: 18) {
-                Text(strings(.sessionNew)).font(typography.title)
+                Text(strings(.sessionNew)).font(typography.title).accessibilityAddTraits(.isHeader)
                 TextField(strings(.sessionName), text: $model.sessionName)
                     .font(typography.panelTitle)
                     .accessibilityLabel(strings(.sessionName))
@@ -73,6 +73,16 @@ struct ActiveSessionView: View {
     @Environment(\.appStrings) private var strings
     @Bindable var model: AppModel
 
+    private func audioPresentation(for side: AudioSide) -> AudioCaptureAccessibilityPresentation {
+        let caller = side == .caller
+        return AudioCaptureAccessibilityPresentation(
+            ready: caller ? model.audio.callerReady : model.audio.agentReady,
+            level: caller ? model.audio.callerLevel : model.audio.agentLevel,
+            paused: model.session.paused,
+            disconnected: caller && model.session.pauseReason == .callerDisconnected,
+            failed: (caller ? model.audio.callerError : model.audio.agentError) != nil)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HSplitView {
@@ -92,6 +102,8 @@ struct ActiveSessionView: View {
                         }
                         LiveConversationWaveform(
                             caller: model.audio.callerWaveform, agent: model.audio.agentWaveform,
+                            callerState: audioPresentation(for: .caller),
+                            agentState: audioPresentation(for: .agent),
                             callerName: model.routeProfile?.caller.name,
                             agentName: model.routeProfile?.agent.name
                         )
@@ -228,8 +240,11 @@ struct ApplicationSelectionView: View {
                 }.pickerStyle(.inline).labelsHidden()
                 Divider()
                 Button(strings(.settingsChooseApplication)) { model.chooseApplication(forAgent: forAgent) }
-            }.frame(maxWidth: .infinity, alignment: .leading).lineLimit(1)
-                .help(application?.name ?? strings(.settingsChooseApplication))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading).lineLimit(1)
+            .accessibilityLabel(title)
+            .accessibilityValue(application?.name ?? strings(.settingsChooseApplication))
+            .help(application?.name ?? strings(.settingsChooseApplication))
         }
     }
 }

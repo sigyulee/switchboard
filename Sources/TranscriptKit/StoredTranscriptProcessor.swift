@@ -48,11 +48,23 @@ public actor StoredTranscriptProcessor {
     /// Event callbacks must not await pause inline; pause joins those callbacks.
     public func process(
         item: RecordingItem, session: SessionManifest? = nil,
+        destinationDirectory: URL? = nil, mode: StoredTranscriptMode = .remaining,
+        onPhase: @escaping @Sendable (StoredTranscriptPhase) async throws -> Void = { _ in },
         onEvent: @escaping @Sendable (TranscriptEvent) async -> Void = { _ in }
     ) async throws -> StoredTranscriptResult {
         guard operation == nil else { throw TranscriptFailure.alreadyRunning }
+        if mode != .remaining || destinationDirectory != nil {
+            guard let destinationDirectory,
+                destinationDirectory.standardizedFileURL.resolvingSymlinksInPath()
+                    != item.directory.standardizedFileURL.resolvingSymlinksInPath()
+            else { throw TranscriptFailure.invalidPath }
+        }
         let id = UUID()
-        let task = Task { try await self.execute(item: item, session: session, onEvent: onEvent) }
+        let task = Task {
+            try await self.execute(
+                item: item, session: session, destinationDirectory: destinationDirectory, mode: mode,
+                onPhase: onPhase, onEvent: onEvent)
+        }
         operationID = id
         operation = task
         defer {
@@ -78,35 +90,48 @@ public actor StoredTranscriptProcessor {
     }
 
     /// Metadata only. Calling this never starts models or audio processing.
-    public static func progress(item: RecordingItem, session: SessionManifest? = nil) async throws
+    public static func progress(
+        item: RecordingItem, session: SessionManifest? = nil, destinationDirectory: URL? = nil,
+        mode: StoredTranscriptMode = .remaining
+    ) async throws
         -> StoredTranscriptProgress
     {
         let (item, session) = try load(item: item, session: session)
-        let journal = try TranscriptJournal(sessionID: item.id, directory: item.directory)
-        return try await progress(item: item, session: session, journal: journal)
+        let journal = try TranscriptJournal(
+            sessionID: item.id, directory: destinationDirectory ?? item.directory)
+        return try await progress(
+            item: item, session: destinationDirectory == nil && mode == .remaining ? session : nil,
+            journal: journal, mode: mode)
     }
 
     private static func progress(
-        item: RecordingItem, session: SessionManifest?, journal: TranscriptJournal
+        item: RecordingItem, session: SessionManifest?, journal: TranscriptJournal,
+        mode: StoredTranscriptMode = .remaining
     ) async throws -> StoredTranscriptProgress {
         let entries = await journal.snapshot()
         let checkpoints = await journal.completedThrough()
         let gaps = await journal.gaps()
         return StoredTranscriptProgress(
             configuration: await journal.configuration(), completedThrough: checkpoints,
-            remainingIntervals: try eligibleIntervals(
-                manifest: item.manifest, session: session, completedThrough: checkpoints,
-                finalEntries: entries, unrecoveredGaps: gaps),
+            remainingIntervals: mode == .translationOnly
+                ? [:]
+                : try eligibleIntervals(
+                    manifest: item.manifest, session: session, completedThrough: checkpoints,
+                    finalEntries: entries, unrecoveredGaps: gaps),
             retryableTranslationCount: retryableTranslations(entries).count)
     }
 
     private func execute(
-        item: RecordingItem, session: SessionManifest?,
+        item: RecordingItem, session: SessionManifest?, destinationDirectory: URL?,
+        mode: StoredTranscriptMode,
+        onPhase: @escaping @Sendable (StoredTranscriptPhase) async throws -> Void,
         onEvent: @escaping @Sendable (TranscriptEvent) async -> Void
     ) async throws -> StoredTranscriptResult {
-        let (item, session) = try Self.load(item: item, session: session)
-        let journal = try TranscriptJournal(sessionID: item.id, directory: item.directory)
-        let initial = try await Self.progress(item: item, session: session, journal: journal)
+        let (item, loadedSession) = try Self.load(item: item, session: session)
+        let session = destinationDirectory == nil && mode == .remaining ? loadedSession : nil
+        let journal = try TranscriptJournal(
+            sessionID: item.id, directory: destinationDirectory ?? item.directory)
+        let initial = try await Self.progress(item: item, session: session, journal: journal, mode: mode)
         guard let configuration = initial.configuration else {
             return StoredTranscriptResult(
                 disposition: .needsConfiguration, progress: initial, states: [:], sourceFailures: [:])
@@ -115,7 +140,8 @@ public actor StoredTranscriptProcessor {
             return StoredTranscriptResult(
                 disposition: .noWork, progress: initial, states: [:], sourceFailures: [:])
         }
-        let retries = Self.retryableTranslations(await journal.snapshot())
+        let translationEntries = await journal.snapshot()
+        let retries = Self.retryableTranslations(translationEntries)
         let token = await journal.beginGeneration()
         let engine = LiveTranscriptEngine()
         var accepted: [AudioSide: Int64] = [:]
@@ -129,6 +155,7 @@ public actor StoredTranscriptProcessor {
                 throw TranscriptFailure.staleSession
             }
             if initial.remainingIntervals.values.contains(where: { !$0.isEmpty }), !Task.isCancelled {
+                try await onPhase(.transcribing)
                 let feeds = try await engine.start(
                     configuration: configuration, journal: journal, token: token, onEvent: onEvent)
                 let production = await withTaskGroup(
@@ -165,11 +192,12 @@ public actor StoredTranscriptProcessor {
                 }
             }
             if !Task.isCancelled {
+                if !retries.isEmpty { try await onPhase(.translating) }
                 try await retryTranslations(
-                    retries, configuration: configuration, journal: journal, token: token,
-                    states: &states, onEvent: onEvent)
+                    retries, contextEntries: translationEntries, configuration: configuration,
+                    journal: journal, token: token, states: &states, onEvent: onEvent)
             }
-            let final = try await Self.progress(item: item, session: session, journal: journal)
+            let final = try await Self.progress(item: item, session: session, journal: journal, mode: mode)
             await journal.invalidate(token: token)
             let disposition: StoredTranscriptDisposition =
                 Task.isCancelled ? .paused : (final.hasWork || !failures.isEmpty ? .incomplete : .completed)
@@ -191,7 +219,8 @@ public actor StoredTranscriptProcessor {
             await journal.invalidate(token: token)
             if let checkpointFailure { throw checkpointFailure }
             if error is CancellationError {
-                let final = try await Self.progress(item: item, session: session, journal: journal)
+                let final = try await Self.progress(
+                    item: item, session: session, journal: journal, mode: mode)
                 return StoredTranscriptResult(
                     disposition: .paused, progress: final, states: completion.states, sourceFailures: failures
                 )
@@ -233,11 +262,14 @@ public actor StoredTranscriptProcessor {
     }
 
     private func retryTranslations(
-        _ entries: [TranscriptEntry], configuration: TranscriptConfiguration, journal: TranscriptJournal,
+        _ entries: [TranscriptEntry], contextEntries: [TranscriptEntry],
+        configuration: TranscriptConfiguration, journal: TranscriptJournal,
         token: TranscriptSessionToken, states: inout [AudioSide: TranscriptSideState],
         onEvent: @escaping @Sendable (TranscriptEvent) async -> Void
     ) async throws {
         let availability = LanguageAvailability()
+        let contexts = try Self.translationContexts(
+            in: contextEntries, configuration: configuration)
         for entry in entries {
             guard !Task.isCancelled else { return }
             var translated: String?
@@ -266,22 +298,58 @@ public actor StoredTranscriptProcessor {
                     if let existing = translations[key] {
                         session = existing
                     } else {
-                        session = TranslationSession(installedSource: source, target: target)
+                        session = TranscriptContextualTranslator.makeSession(
+                            source: source, target: target)
                         translations[key] = session
                     }
+                    let contextual: (TranscriptTranslationContextPlan, [UUID: String])?
                     do {
-                        let response = try await session.translate(entry.original)
-                        guard !Task.isCancelled else { return }
-                        let text = response.targetText.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !text.isEmpty, text.utf8.count <= TranscriptLimits.maximumTextBytes else {
+                        guard let context = contexts[entry.id] else {
                             throw TranscriptFailure.invalidEntry
                         }
-                        translated = text
-                        status = .translated
+                        let plan = try TranscriptTranslationContextPlan(
+                            entries: context,
+                            revisionCount: min(
+                                TranscriptTranslationContextPlan.maximumRevisionEntries, context.count))
+                        if let values = try await TranscriptContextualTranslator.contextualTranslations(
+                            plan, session: session)
+                        {
+                            contextual = (plan, values)
+                        } else {
+                            contextual = nil
+                        }
                     } catch {
                         guard !Task.isCancelled else { return }
-                        status = .failed
-                        message = String(error.localizedDescription.prefix(2048))
+                        contextual = nil
+                    }
+                    if let (plan, values) = contextual {
+                        for prior in plan.entries
+                        where prior.id != entry.id && plan.revisedEntryIDs.contains(prior.id) {
+                            guard let value = values[prior.id],
+                                try await journal.updateTranslation(
+                                    entryID: prior.id, original: prior.original,
+                                    translation: value, status: .translated, token: token)
+                            else { throw TranscriptFailure.staleSession }
+                            var updated = prior
+                            updated.translation = value
+                            updated.translationStatus = .translated
+                            await onEvent(.upsert(updated))
+                        }
+                        guard let value = values[entry.id] else {
+                            throw TranscriptFailure.invalidEntry
+                        }
+                        translated = value
+                        status = .translated
+                    } else {
+                        do {
+                            translated = try await TranscriptContextualTranslator.standaloneTranslation(
+                                entry.original, session: session)
+                            status = .translated
+                        } catch {
+                            guard !Task.isCancelled else { return }
+                            status = .failed
+                            message = String(error.localizedDescription.prefix(2048))
+                        }
                     }
                 }
             }
@@ -312,6 +380,51 @@ public actor StoredTranscriptProcessor {
             states[entry.side] = state
             await onEvent(.state(state))
         }
+    }
+
+    public static func translationContext(
+        for target: TranscriptEntry, in entries: [TranscriptEntry],
+        configuration: TranscriptConfiguration
+    ) throws -> [TranscriptEntry] {
+        guard target.isFinal,
+            let context = try translationContexts(
+                in: entries, configuration: configuration)[target.id],
+            context.last?.id == target.id
+        else { throw TranscriptFailure.invalidEntry }
+        return context
+    }
+
+    public static func translationContexts(
+        in entries: [TranscriptEntry], configuration: TranscriptConfiguration
+    ) throws -> [UUID: [TranscriptEntry]] {
+        try configuration.validate()
+        guard entries.count <= TranscriptLimits.maximumEntries,
+            Set(entries.map(\.id)).count == entries.count
+        else { throw TranscriptFailure.invalidEntry }
+        for entry in entries {
+            try entry.validate()
+            guard entry.isFinal else { throw TranscriptFailure.invalidEntry }
+        }
+        let ordered = entries.sorted {
+            ($0.startFrame, $0.endFrame, $0.id.uuidString)
+                < ($1.startFrame, $1.endFrame, $1.id.uuidString)
+        }
+        var histories: [String: [TranscriptEntry]] = [:]
+        var result: [UUID: [TranscriptEntry]] = [:]
+        result.reserveCapacity(ordered.count)
+        for entry in ordered {
+            let sourceKey = TranscriptConfiguration.languageKey(
+                configuration.sourceLocaleIdentifier(for: entry.side))
+            var history = histories[sourceKey, default: []]
+            history.append(entry)
+            if history.count > TranscriptTranslationContextPlan.maximumContextEntries {
+                history.removeFirst(
+                    history.count - TranscriptTranslationContextPlan.maximumContextEntries)
+            }
+            histories[sourceKey] = history
+            result[entry.id] = history
+        }
+        return result
     }
 
     public static func retryableTranslations(_ entries: [TranscriptEntry]) -> [TranscriptEntry] {

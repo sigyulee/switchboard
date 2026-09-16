@@ -56,6 +56,14 @@ results from modifying another session. Translation runs only on finalized text;
 equal source and target languages bypass translation. Language models and pairs
 are checked at runtime, and model installation requires a download action.
 
+Saved transcription jobs use a separate durable journal inside the package. Full
+transcription reads all stored source intervals; translation-only jobs reuse final
+utterances. Pausing joins admitted input before checkpointing. Interrupted jobs
+restore as paused, and finished candidates wait for explicit Apply or Discard.
+Apply validates source metadata and the original transcript baseline, then
+atomically publishes the candidate journal. Original audio and session timing are
+unchanged. Package copies retain resumable candidates independently.
+
 Older `.mihrecording` packages retain their original decoding and playback path.
 
 ## Installation

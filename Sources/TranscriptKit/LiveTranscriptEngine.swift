@@ -275,9 +275,15 @@ public actor LiveTranscriptEngine {
         guard let current = run, current.id == id else { return }
         let key = pairKey(configuration: current.configuration, side: side)
         guard current.translations[key] == nil else { return }
+        let sourceIdentifier = current.configuration.sourceLocaleIdentifier(for: side)
+        let sourceKey = TranscriptConfiguration.languageKey(sourceIdentifier)
+        let initialEntries = await current.journal.snapshot().filter {
+            TranscriptConfiguration.languageKey(
+                current.configuration.sourceLocaleIdentifier(for: $0.side)) == sourceKey
+        }
         let worker = TranscriptTranslationWorker(
-            source: current.configuration.sourceLocaleIdentifier(for: side),
-            target: current.configuration.targetLocaleIdentifier
+            source: sourceIdentifier, target: current.configuration.targetLocaleIdentifier,
+            initialEntries: initialEntries
         ) { [weak self] entry, text, status in
             await self?.translated(entry, text: text, status: status, id: id)
         }

@@ -48,6 +48,30 @@ struct RecordingValidationChecks {
         try expectThrows { _ = try RecordingManifest.load(from: directory) }
     }
 
+    func manifestInputsAreBoundedAndDoNotFollowLinks() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let package = root.appendingPathComponent("Fixture.mihrecording")
+        try FileManager.default.createDirectory(at: package, withIntermediateDirectories: false)
+        let manifest = RecordingManifest(title: "Original", owner: .manual)
+        let bytes = try JSONEncoder().encode(manifest)
+        let external = root.appendingPathComponent("external.json")
+        try bytes.write(to: external)
+        let file = package.appendingPathComponent("manifest.json")
+        try FileManager.default.createSymbolicLink(at: file, withDestinationURL: external)
+        try expectThrows { _ = try RecordingLibrary.item(at: package) }
+        try expect(Data(contentsOf: external) == bytes)
+        try FileManager.default.removeItem(at: file)
+        var oversized = Data(repeating: 0x20, count: 16 * 1024 * 1024)
+        oversized.append(bytes)
+        try oversized.write(to: file)
+        try expectThrows { _ = try RecordingLibrary.item(at: package) }
+        try bytes.write(to: file)
+        try expect(RecordingLibrary.item(at: package).manifest == manifest)
+        try expect(FileManager.default.contentsOfDirectory(atPath: package.path) == ["manifest.json"])
+    }
+
     func monoBuffersAreRejected() throws {
         guard
             let format = AVAudioFormat(

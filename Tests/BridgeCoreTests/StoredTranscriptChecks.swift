@@ -2,8 +2,121 @@ import BridgeCore
 import Foundation
 import RecorderKit
 import TranscriptKit
+@preconcurrency import Translation
 
 struct StoredTranscriptChecks {
+    func contextualTranslationKeepsTimelineAndRevisesOnlyRecentEntries() throws {
+        guard #available(macOS 26.4, *) else { return }
+        let values = (0..<8).map { index in
+            TranscriptEntry(
+                id: UUID(), side: index.isMultiple(of: 2) ? .caller : .agent,
+                startFrame: Int64(index * 100), endFrame: Int64(index * 100 + 80),
+                original: "Utterance \(index)", isFinal: true)
+        }
+        let plan = try TranscriptTranslationContextPlan(
+            entries: Array(values.suffix(6)), revisionCount: 3)
+        try check(plan.entries.map(\.id) == Array(values.suffix(6)).map(\.id))
+        try check(plan.revisedEntryIDs == Array(values.suffix(3)).map(\.id))
+
+        let translated = plan.entries.map { "KO \($0.original)" }
+        var output = AttributedString()
+        for index in plan.entries.indices {
+            if index > 0 { output.append(AttributedString(" ")) }
+            var value = AttributedString(translated[index])
+            value.link = plan.entryLinks[index]
+            output.append(value)
+        }
+        let parsed = try plan.parse(output)
+        try check(plan.revisedEntryIDs.compactMap { parsed[$0] } == Array(translated.suffix(3)))
+        try check(plan.entries.map(\.startFrame) == Array(values.suffix(6)).map(\.startFrame))
+    }
+
+    func contextualTranslationRejectsAmbiguousEngineOutput() throws {
+        guard #available(macOS 26.4, *) else { return }
+        let values = (0..<2).map { index in
+            TranscriptEntry(
+                id: UUID(), side: .caller, startFrame: Int64(index * 100),
+                endFrame: Int64(index * 100 + 80), original: "Line \(index)", isFinal: true)
+        }
+        let plan = try TranscriptTranslationContextPlan(entries: values, revisionCount: 2)
+        var duplicate = AttributedString("첫 번째")
+        duplicate.link = plan.entryLinks[0]
+        var duplicateMiddle = AttributedString("두 번째")
+        duplicateMiddle.link = plan.entryLinks[1]
+        duplicate.append(duplicateMiddle)
+        var duplicateTail = AttributedString("중복")
+        duplicateTail.link = plan.entryLinks[0]
+        duplicate.append(duplicateTail)
+        var reversed = AttributedString("두 번째")
+        reversed.link = plan.entryLinks[1]
+        var first = AttributedString("첫 번째")
+        first.link = plan.entryLinks[0]
+        reversed.append(first)
+        var missing = AttributedString("첫 번째")
+        missing.link = plan.entryLinks[0]
+        var unknown = AttributedString("알 수 없음")
+        unknown.link = URL(string: "switchboard-entry://unknown")!
+        for output in [AttributedString("번역만 있고 범위 없음"), duplicate, reversed, missing, unknown] {
+            var rejected = false
+            do { _ = try plan.parse(output) } catch { rejected = true }
+            try check(rejected)
+        }
+    }
+
+    func contextualTranslationUsesOnlyPriorEntriesFromTheSameSourceLanguage() throws {
+        let callerBefore = TranscriptEntry(
+            id: UUID(), side: .caller, startFrame: 0, endFrame: 80,
+            original: "Caller before", isFinal: true)
+        let agentBetween = TranscriptEntry(
+            id: UUID(), side: .agent, startFrame: 100, endFrame: 180,
+            original: "Agent between", isFinal: true)
+        let callerCurrent = TranscriptEntry(
+            id: UUID(), side: .caller, startFrame: 200, endFrame: 280,
+            original: "Caller current", isFinal: true)
+        let callerAfter = TranscriptEntry(
+            id: UUID(), side: .caller, startFrame: 300, endFrame: 380,
+            original: "Caller after", isFinal: true)
+        let mixed = try TranscriptConfiguration(
+            callerLocaleIdentifier: "en-US", agentLocaleIdentifier: "ko-KR",
+            targetLocaleIdentifier: "ja-JP")
+        let mixedContext = try StoredTranscriptProcessor.translationContext(
+            for: callerCurrent,
+            in: [callerAfter, agentBetween, callerCurrent, callerBefore],
+            configuration: mixed)
+        try check(mixedContext.map(\.id) == [callerBefore.id, callerCurrent.id])
+
+        let shared = try TranscriptConfiguration(
+            callerLocaleIdentifier: "en-US", agentLocaleIdentifier: "en-GB",
+            targetLocaleIdentifier: "ko-KR")
+        let sharedContext = try StoredTranscriptProcessor.translationContext(
+            for: callerCurrent,
+            in: [callerAfter, agentBetween, callerCurrent, callerBefore],
+            configuration: shared)
+        try check(sharedContext.map(\.id) == [callerBefore.id, agentBetween.id, callerCurrent.id])
+    }
+
+    func contextualTranslationCarriesInvisibleEntryRanges() throws {
+        guard #available(macOS 26.4, *) else { return }
+        let entries = (0..<2).map { index in
+            TranscriptEntry(
+                id: UUID(), side: .caller, startFrame: Int64(index * 100),
+                endFrame: Int64(index * 100 + 80), original: "Line \(index)", isFinal: true)
+        }
+        let plan = try TranscriptTranslationContextPlan(entries: entries, revisionCount: 2)
+        let attributed = plan.attributedSourceText()
+        try check(String(attributed.characters) == entries.map(\.original).joined(separator: " "))
+        for index in entries.indices {
+            guard let range = attributed.range(of: entries[index].original) else {
+                throw CheckFailure(description: "missing attributed entry")
+            }
+            try check(attributed[range].runs.allSatisfy { $0.link == plan.entryLinks[index] })
+        }
+        try check(
+            attributed.runs.contains {
+                $0.link == nil && String(attributed.characters[$0.range]) == " "
+            })
+    }
+
     func recordedEligibilityIncludesInitialBackfillAndSkipsExplicitOff() throws {
         var session = try SessionState(name: "Eligible intervals")
         try session.start(at: 0)

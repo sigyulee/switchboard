@@ -60,6 +60,7 @@ private struct FocusListProbe: View {
             ("native divider constraints bound the sidebar", dividerConstraintsAndInvalidPreferences),
             ("both hosting views receive updated environments", hostingBoundariesPreserveEnvironment),
             ("native list focus rings stay disabled across content replacement", listFocusRing),
+            ("selected rows show local keyboard focus without an exterior ring", localRowFocus),
             ("dismantling releases the delegate and cancels pending writes", dismantlingCancelsPublication),
         ]
         var failures = 0
@@ -210,6 +211,27 @@ private struct FocusListProbe: View {
             reference.value == nil && split.delegate == nil, "The split view retained its coordinator")
         await Task.yield()
         try require(selection.writes.isEmpty, "A removed split view published an old divider change")
+    }
+
+    private static func localRowFocus() async throws {
+        try require(
+            LibraryRowFocusPresentation.lineWidth(
+                selected: true, listFocused: true, increasedContrast: false) > 0,
+            "the focused selected row has no local indicator")
+        try require(
+            LibraryRowFocusPresentation.lineWidth(
+                selected: true, listFocused: true, increasedContrast: true)
+                > LibraryRowFocusPresentation.lineWidth(
+                    selected: true, listFocused: true, increasedContrast: false),
+            "Increase Contrast does not strengthen row focus")
+        try require(
+            LibraryRowFocusPresentation.lineWidth(
+                selected: false, listFocused: true, increasedContrast: false) == 0,
+            "an unselected row draws a misleading focus indicator")
+        try require(
+            LibraryRowFocusPresentation.lineWidth(
+                selected: true, listFocused: false, increasedContrast: false) == 0,
+            "selection was mistaken for keyboard focus")
     }
 
     private static func listFocusRing() async throws {

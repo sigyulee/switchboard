@@ -15,7 +15,7 @@ struct TranscriptPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text(strings(.transcriptTitle)).font(typography.panelTitle)
+                Text(strings(.transcriptTitle)).font(typography.panelTitle).accessibilityAddTraits(.isHeader)
                 Spacer()
                 if model.transcript.catchingUp {
                     ProgressView().controlSize(.small).accessibilityLabel(strings(.transcriptCatchingUp))
@@ -43,7 +43,8 @@ struct TranscriptPanel: View {
             } else {
                 TranscriptMessages(
                     transcriptID: transcriptID, entries: model.transcript.entries,
-                    isProcessing: model.transcript.isProcessing
+                    isProcessing: model.transcript.isProcessing,
+                    announcer: model.accessibilityAnnouncer, announcesFinalEntries: true
                 ).id(transcriptID)
             }
             if let error = model.transcript.error,
@@ -201,12 +202,13 @@ struct TranscriptPanel: View {
     private func engineStatus(_ title: String, kind: TranscriptEnginePresentation.Kind) -> some View {
         let presentation = TranscriptEnginePresentation(kind: kind, states: model.transcript.states)
         let state = presentation.state
-        let color: Color =
+        let statusKind: AccessibleStatusKind =
             switch state {
-            case .ready: .green
-            case .downloadRequired: .orange
-            case .failed, .resourceLimit, .unsupported: .red
-            default: .secondary
+            case .ready: .ready
+            case .downloadRequired: .warning
+            case .failed, .resourceLimit, .unsupported: .error
+            case .notNeeded, .stopped: .inactive
+            default: .progress
             }
         let label: TextKey =
             switch state {
@@ -220,12 +222,13 @@ struct TranscriptPanel: View {
             default: .transcriptWaiting
             }
         return VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(typography.caption).foregroundStyle(.secondary)
-            Label {
-                Text(strings(label)).font(typography.caption.weight(.medium))
-            } icon: {
-                Circle().fill(color).frame(width: 7, height: 7)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title).font(typography.caption).foregroundStyle(.secondary)
+                AccessibleStatusLabel(text: strings(label), kind: statusKind)
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(title)
+            .accessibilityValue(strings(label))
             if let issue = presentation.issue {
                 InlineIssueView(message: strings(issue), details: presentation.details)
             } else if state == .unsupported {

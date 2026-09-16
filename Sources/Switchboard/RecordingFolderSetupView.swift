@@ -13,10 +13,12 @@ struct RecordingFolderSetupView: View {
         VStack(alignment: .leading, spacing: 24) {
             HStack(spacing: 14) {
                 SwitchboardMark().frame(width: 44, height: 44)
-                Text("Switchboard").font(typography.title)
+                Text("Switchboard").font(typography.title).accessibilityAddTraits(.isHeader)
             }
             VStack(alignment: .leading, spacing: 10) {
-                Text(strings(.settingsDefaultFolder)).font(typography.panelTitle)
+                Text(strings(.settingsDefaultFolder)).font(typography.panelTitle).accessibilityAddTraits(
+                    .isHeader
+                ).accessibilityInitialFocus()
                 Text(strings(.folderChooseDescription)).font(typography.body).foregroundStyle(.secondary)
                 Label(folder.path, systemImage: "folder")
                     .font(typography.body).textSelection(.enabled)

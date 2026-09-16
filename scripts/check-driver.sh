@@ -30,14 +30,16 @@ xcrun swiftc -swift-version 6 -D INSTALLER_TESTING -parse-as-library \
 for name in MIHCaller MIHReply SwitchboardAgent; do
     # The system include path suppresses warnings only in the upstream translation
     # unit. The harness retains strict warnings, and sanitizers instrument both.
-    xcrun --sdk macosx clang -std=c11 -arch arm64 -mmacosx-version-min=26.0 \
-        -O1 -g -Wall -Wextra -Werror -fno-omit-frame-pointer -fblocks -pthread \
-        "${instrumentation[@]}" -DkNumber_Of_Channels=2 -DkHas_Driver_Name_Format=false \
-        "-DkDriver_Name=\"${name}\"" -isystem "$check_directory" \
-        Tests/DriverChecks/PropertyChecks.c \
-        -framework CoreAudio -framework Accelerate -framework CoreFoundation \
-        -o "$check_directory/PropertyChecks${name}"
-    ASAN_OPTIONS=halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 TSAN_OPTIONS=halt_on_error=1 \
-        "$check_directory/PropertyChecks${name}"
+    for check in PropertyChecks NameOwnershipChecks; do
+        xcrun --sdk macosx clang -std=c11 -arch arm64 -mmacosx-version-min=26.0 \
+            -O1 -g -Wall -Wextra -Werror -fno-omit-frame-pointer -fblocks -pthread \
+            "${instrumentation[@]}" -DkNumber_Of_Channels=2 -DkHas_Driver_Name_Format=false \
+            "-DkDriver_Name=\"${name}\"" -isystem "$check_directory" \
+            "Tests/DriverChecks/${check}.c" \
+            -framework CoreAudio -framework Accelerate -framework CoreFoundation \
+            -o "$check_directory/${check}${name}"
+        ASAN_OPTIONS=halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 TSAN_OPTIONS=halt_on_error=1 \
+            "$check_directory/${check}${name}"
+    done
 done
 printf 'Driver callback checks passed (%s).\n' "$sanitizer"

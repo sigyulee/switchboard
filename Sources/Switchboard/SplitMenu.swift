@@ -11,6 +11,7 @@ struct SplitMenuOption {
 struct SplitMenu: NSViewRepresentable {
     @Environment(\.isEnabled) private var enabled
     let label: String
+    var value: String? = nil
     let side: CGFloat
     let pointSize: CGFloat
     let options: [SplitMenuOption]
@@ -21,7 +22,7 @@ struct SplitMenu: NSViewRepresentable {
         let view = SplitMenuControl(frame: .zero, pullsDown: true)
         view.cell = SplitMenuCell(textCell: "", pullsDown: true)
         view.isBordered = false
-        view.focusRingType = .none
+        view.focusRingType = .default
         context.coordinator.view = view
         return view
     }
@@ -31,6 +32,7 @@ struct SplitMenu: NSViewRepresentable {
         view.isEnabled = enabled
         if !enabled && view.menuIsOpen { view.menu?.cancelTracking() }
         view.setAccessibilityLabel(label)
+        view.setAccessibilityValue(value)
         view.toolTip = label
         context.coordinator.options = options
         context.coordinator.label = label

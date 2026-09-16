@@ -84,6 +84,12 @@ jobs:
         run: bash scripts/check-pipeline.sh release
       - name: Check transcript follow layout
         run: bash scripts/check-transcript-scroll.sh release
+      - name: Check accessibility announcements and state
+        run: bash scripts/check-accessibility.sh release
+      - name: Check library navigation and audio update isolation
+        run: bash scripts/check-library-navigation.sh release
+      - name: Check saved transcript processing and review
+        run: bash scripts/check-stored-processing.sh release
       - name: Check continuous transcription audio
         run: bash scripts/check-transcript-pcm.sh release
 

@@ -3,9 +3,12 @@ import SwiftUI
 
 struct SplitActionButton: View {
     @Environment(\.appTypography) private var typography
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
     let title: String
     let systemImage: String
     let menuLabel: String
+    var menuValue: String? = nil
     let action: () -> Void
     let options: [SplitMenuOption]
     private var height: CGFloat { max(44, typography.controlSide) }
@@ -20,14 +23,23 @@ struct SplitActionButton: View {
                     .contentShape(Rectangle())
             }.buttonStyle(SplitSegmentStyle())
             SplitMenu(
-                label: menuLabel, side: height,
-                pointSize: NSFont.preferredFont(forTextStyle: .body).pointSize * typography.textSize.scale,
+                label: menuLabel, value: menuValue, side: height,
+                pointSize: NSFont.preferredFont(forTextStyle: .body).pointSize,
                 options: options
             )
             .frame(width: height, height: height)
         }
         .buttonBorderShape(.roundedRectangle(radius: 0))
-        .background(.quaternary, in: Capsule())
+        .background(
+            reduceTransparency
+                ? AnyShapeStyle(Color(nsColor: .controlBackgroundColor)) : AnyShapeStyle(.quaternary),
+            in: Capsule()
+        )
+        .overlay(
+            Capsule().strokeBorder(
+                .primary.opacity(contrast == .increased ? 0.3 : 0),
+                lineWidth: contrast == .increased ? 2 : 0)
+        )
         .clipShape(Capsule())
         .fixedSize(horizontal: true, vertical: false)
         .accessibilityElement(children: .contain)

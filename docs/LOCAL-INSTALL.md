@@ -16,6 +16,20 @@ Requires Apple Silicon and macOS 26 or later.
 Microphone access receives audio from the virtual device. System-audio access
 receives playback from your selected Agent app.
 
+## Opening a downloaded release
+
+The current downloads are ad-hoc signed and are not notarized by Apple. After
+moving the app to Applications, try **System Settings → Privacy & Security → Open
+Anyway** if macOS blocks it.
+
+If it remains blocked, and you trust the release downloaded from this repository,
+remove quarantine from this app only, then open it:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Switchboard.app
+open /Applications/Switchboard.app
+```
+
 ## Sessions
 
 Enter a name and press **Start**. Recording begins immediately. You can turn
@@ -26,8 +40,8 @@ languages and your translation language before starting transcription.
 choices. Paused time remains silent in the audio.
 
 Use **End Session → Save** to choose the file name and location. Sessions are saved
-as `.switchboard` files. On first launch, choose the interface language, confirm the save folder, then
-complete Audio Setup. New installations suggest `~/Documents/Switchboard`.
+as `.switchboard` files. On first launch, choose the interface language, confirm
+the save folder, then complete Audio Setup. New installations suggest `~/Documents/Switchboard`.
 Existing installations keep their current save folder. Change the folder or add
 library folders in Settings.
 

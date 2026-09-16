@@ -18,6 +18,7 @@ struct LanguageModelsView: View {
         VStack(alignment: .leading, spacing: 20) {
             HStack {
                 Text(strings(.transcriptModels)).font(typography.panelTitle)
+                    .accessibilityAddTraits(.isHeader).accessibilityInitialFocus()
                 Spacer()
                 Button(strings(downloading ? .actionCancel : .actionDone)) {
                     downloadTask?.cancel()
@@ -56,7 +57,7 @@ struct LanguageModelsView: View {
             }
             if downloading { ProgressView().controlSize(.small) }
             if let error { Text(error).foregroundStyle(.orange).font(typography.caption) }
-        }.padding(24).frame(width: 460)
+        }.padding(24).frame(minWidth: 460, idealWidth: 560, maxWidth: 700)
             .onDisappear {
                 downloadTask?.cancel()
                 downloadTask = nil

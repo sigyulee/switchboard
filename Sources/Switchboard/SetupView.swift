@@ -22,7 +22,8 @@ struct SetupView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text(strings(.setupTitle)).font(typography.title)
+                Text(strings(.setupTitle)).font(typography.title).accessibilityAddTraits(.isHeader)
+                    .accessibilityInitialFocus()
                 Spacer()
                 IconButton("xmark", label: strings(.actionClose)) { dismiss() }
                     .keyboardShortcut(.cancelAction)
@@ -144,7 +145,9 @@ struct SettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack {
-                Text(strings(.navigationSettings)).font(typography.panelTitle)
+                Text(strings(.navigationSettings)).font(typography.panelTitle).accessibilityAddTraits(
+                    .isHeader
+                ).accessibilityInitialFocus()
                 Spacer()
                 Button(strings(.actionDone)) { dismiss() }
             }
@@ -158,9 +161,7 @@ struct SettingsView: View {
                     Text(language.nativeName).tag(language)
                 }
             }
-            Picker(strings(.settingsTextSize), selection: $model.textSize) {
-                ForEach(AppTextSize.allCases) { size in Text(strings(size.label)).tag(size) }
-            }
+            .accessibilityLabel(strings(.settingsLanguage))
             Divider()
             ApplicationSelectionView(model: model)
             InputOutputGuide(expanded: $model.showInputOutputGuide)
@@ -226,12 +227,11 @@ struct DriverStatusRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Circle().fill(available ? Color.green : Color.red).frame(width: 7, height: 7)
-                .accessibilityHidden(true)
             Text(name)
             Spacer()
-            Text(strings(available ? .driverAvailable : .driverMissing))
-                .foregroundStyle(.secondary)
+            AccessibleStatusLabel(
+                text: strings(available ? .driverAvailable : .driverMissing),
+                kind: available ? .ready : .error)
         }
         .font(typography.caption)
         .accessibilityElement(children: .combine)

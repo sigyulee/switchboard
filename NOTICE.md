@@ -13,6 +13,8 @@ BlackHole source remains licensed under GNU GPL version 3. Its copyright and
 complete upstream notice are preserved in
 [Vendor/BlackHole/LICENSE](Vendor/BlackHole/LICENSE).
 
-The two audio drivers are built locally from that pinned source with independent
-device identifiers and project-specific names. They are unofficial builds, not
-the compiled BlackHole products distributed by Existential Audio Inc.
+The three audio drivers are built locally from that pinned source with independent
+device identifiers and project-specific names. Local patches adjust property
+contracts and shared-name ownership; the upstream source files remain intact.
+They are unofficial builds, not the compiled BlackHole products distributed by
+Existential Audio Inc.

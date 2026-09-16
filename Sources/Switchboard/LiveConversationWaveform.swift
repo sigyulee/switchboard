@@ -5,26 +5,62 @@ struct LiveConversationWaveform: View {
     @Environment(\.appStrings) private var strings
     let caller: [Float]
     let agent: [Float]
+    let callerState: AudioCaptureAccessibilityPresentation
+    let agentState: AudioCaptureAccessibilityPresentation
     var callerName: String? = nil
     var agentName: String? = nil
 
     var body: some View {
-        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
-            row(strings(.waveformCaller), application: callerName, samples: caller, color: .teal)
-            row("Agent", application: agentName, samples: agent, color: .blue)
+        Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 12) {
+            row(
+                strings(.waveformCaller), application: callerName, samples: caller, color: .teal,
+                presentation: callerState)
+            row(
+                "Agent", application: agentName, samples: agent, color: .blue,
+                presentation: agentState)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(strings(.waveformLive))
+        .accessibilityValue(accessibilitySummary)
     }
 
-    private func row(_ title: String, application: String?, samples: [Float], color: Color) -> some View {
-        GridRow {
-            VStack(alignment: .leading, spacing: 2) {
+    private var accessibilitySummary: String {
+        [
+            rowSummary(strings(.waveformCaller), application: callerName, presentation: callerState),
+            rowSummary("Agent", application: agentName, presentation: agentState),
+        ].joined(separator: "; ")
+    }
+
+    private func rowSummary(
+        _ title: String, application: String?, presentation: AudioCaptureAccessibilityPresentation
+    ) -> String {
+        [title, application, stateText(presentation.state)].compactMap { $0 }.joined(separator: ", ")
+    }
+
+    private func stateText(_ state: AudioCaptureAccessibilityState) -> String {
+        switch state {
+        case .receiving: strings(.accessibilityAudioReceiving)
+        case .quiet: strings(.accessibilityAudioQuiet)
+        case .paused: strings(.accessibilityAudioPaused)
+        case .disconnected: strings(.accessibilityAudioDisconnected)
+        case .unavailable: strings(.accessibilityAudioUnavailable)
+        case .failed: strings(.accessibilityAudioFailed)
+        }
+    }
+
+    private func row(
+        _ title: String, application: String?, samples: [Float], color: Color,
+        presentation: AudioCaptureAccessibilityPresentation
+    ) -> some View {
+        let status = stateText(presentation.state)
+        return GridRow {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(typography.caption.weight(.medium))
                 if let application {
-                    Text(application).font(typography.caption).lineLimit(1).help(application)
+                    Text(application).font(typography.caption).lineLimit(2).help(application)
                 }
-            }.foregroundStyle(.secondary).frame(maxWidth: 120, alignment: .leading)
+                AccessibleStatusLabel(text: status, kind: presentation.kind)
+            }.frame(maxWidth: 180, alignment: .leading)
             Canvas { context, size in
                 let center = size.height / 2
                 var baseline = Path()
@@ -41,9 +77,14 @@ struct LiveConversationWaveform: View {
                         width: max(1, step * 0.58), height: height)
                     let opacity = 0.3 + 0.7 * Double(index + 1) / Double(samples.count)
                     context.fill(
-                        Path(roundedRect: rect, cornerRadius: step / 2), with: .color(color.opacity(opacity)))
+                        Path(roundedRect: rect, cornerRadius: step / 2),
+                        with: .color(color.opacity(opacity)))
                 }
-            }.frame(height: 18)
+            }.frame(minWidth: 100, idealWidth: 180, maxWidth: .infinity).frame(height: 24)
+                .accessibilityHidden(true)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            [title, application, status].compactMap { $0 }.joined(separator: ", "))
     }
 }

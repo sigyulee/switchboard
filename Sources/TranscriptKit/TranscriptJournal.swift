@@ -1,4 +1,5 @@
 import BridgeCore
+import CryptoKit
 import Darwin
 import Foundation
 
@@ -129,6 +130,52 @@ public actor TranscriptJournal {
                 if entry.translationStatus == .pending { entry.translationStatus = .interrupted }
                 return entry
             }, gaps: archive.gaps, configuration: archive.configuration)
+    }
+
+    /// Seed a separate work journal; final entries and checkpoints stay on the original timeline.
+    public func seed(
+        entries: [TranscriptEntry], configuration: TranscriptConfiguration,
+        checkpoints: [AudioSide: Int64] = [:], gaps: [TranscriptGap] = []
+    ) throws {
+        try configuration.validate()
+        guard token == nil, entries.count <= TranscriptLimits.maximumEntries,
+            gaps.count <= TranscriptLimits.maximumGaps, Set(entries.map(\.id)).count == entries.count
+        else { throw TranscriptFailure.invalidEntry }
+        for entry in entries {
+            try entry.validate()
+            guard entry.isFinal else { throw TranscriptFailure.invalidEntry }
+        }
+        for gap in gaps { try gap.validate() }
+        for frame in checkpoints.values {
+            guard frame >= 0, frame <= TranscriptLimits.maximumFrame else {
+                throw TranscriptFailure.invalidEntry
+            }
+        }
+        let encoded = Dictionary(uniqueKeysWithValues: checkpoints.map { ($0.key.rawValue, $0.value) })
+        try persist(entries, configuration: configuration, gaps: gaps, completedThrough: encoded)
+        self.entries = entries
+        configurationValue = configuration
+        checkpointValues = encoded
+        gapValues = gaps
+    }
+
+    public static func digest(sessionID: UUID, directory: URL) throws -> String {
+        let data = try TranscriptJournalDirectory(directory: directory, sessionID: sessionID).readTranscript()
+        return data.map { SHA256.hash(data: $0).map { String(format: "%02x", $0) }.joined() } ?? "absent"
+    }
+
+    /// Validate the candidate and the publication baseline before the descriptor-anchored atomic commit.
+    public static func publish(sessionID: UUID, from source: URL, to destination: URL, expectedDigest: String)
+        throws
+    {
+        _ = try readArchive(sessionID: sessionID, directory: source)
+        let sourceLocation = try TranscriptJournalDirectory(directory: source, sessionID: sessionID)
+        guard let data = try sourceLocation.readTranscript() else { throw TranscriptFailure.invalidEntry }
+        let location = try TranscriptJournalDirectory(directory: destination, sessionID: sessionID)
+        guard try digest(sessionID: sessionID, directory: destination) == expectedDigest else {
+            throw TranscriptFailure.staleSession
+        }
+        try location.commit(data)
     }
 
     /// Persist language choices before beginning a generation. Changed choices invalidate old work.

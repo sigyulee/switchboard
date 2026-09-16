@@ -15,8 +15,9 @@ import SwiftUI
     static func combinedControl() {
         let host = NSHostingView(
             rootView: SplitActionButton(
-                title: "Play", systemImage: "play.fill", menuLabel: "Source tracks", action: {}, options: []
-            ).environment(\.appTypography, AppTypography(textSize: .standard)))
+                title: "Play", systemImage: "play.fill", menuLabel: "Source tracks", menuValue: "Mix",
+                action: {}, options: []
+            ).environment(\.appTypography, AppTypography()))
         host.frame = NSRect(origin: .zero, size: host.fittingSize)
         let window = NSWindow(
             contentRect: host.frame, styleMask: .borderless, backing: .buffered, defer: false)
@@ -38,6 +39,12 @@ import SwiftUI
         precondition(
             abs(menu.frame.width - menu.side) < 0.5,
             "Native menu overhang shifts the highlight away from its allocated split boundary")
+        precondition(
+            menu.focusRingType == .default,
+            "The dropdown segment hides its keyboard focus indication")
+        precondition(
+            menu.accessibilityValue() as? String == "Mix",
+            "The dropdown segment does not expose the selected source")
     }
     static func main() {
         _ = NSApplication.shared

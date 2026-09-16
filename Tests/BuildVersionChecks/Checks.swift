@@ -6,7 +6,7 @@ import Foundation
             "CFBundleShortVersionString": "1.1.0", "CFBundleVersion": "45",
             "SourceCommit": "private-commit", "GitBranch": "private-branch",
         ])
-        precondition(version.display == "1.1.0 (45)", "Version display must contain only release and build")
+        precondition(version.display == "1.1.0", "Internal build numbers must stay out of the app UI")
         precondition(
             AppBuildVersion(info: [:]).display == "—", "Missing metadata must not invent an identity")
         precondition(
@@ -16,7 +16,7 @@ import Foundation
             AppBuildVersion(info: [
                 "CFBundleShortVersionString": "1.1.0", "CFBundleVersion": "5",
                 "SwitchboardReleaseChannel": "beta",
-            ]).display == "1.1.0 beta (5)")
-        print("4 build-version display checks passed; Git metadata is not displayed.")
+            ]).display == "1.1.0 beta")
+        print("4 semantic-version display checks passed; build and Git metadata are not displayed.")
     }
 }

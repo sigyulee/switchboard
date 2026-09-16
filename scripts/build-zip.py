@@ -30,7 +30,8 @@ def main():
     channel = record.get("channel", "stable")
     if channel not in ("beta", "stable"):
         raise ValueError("Invalid release channel")
-    output = ROOT / "build" / f"Switchboard-{record['release']}-{channel}-{record['build']}-arm64.zip"
+    suffix = "-beta" if channel == "beta" else ""
+    output = ROOT / "build" / f"Switchboard-{record['release']}{suffix}-arm64.zip"
     try:
         with zipfile.ZipFile(output, "x", compression=zipfile.ZIP_DEFLATED) as archive:
             for path in [app, *sorted(app.rglob("*"))]:

@@ -4,7 +4,11 @@
     {
       "file": "0001-property-contracts.patch",
       "sha256": "f9ff8369322b1da88217ff811a4dfb69d75f4cb62df499313ed899084e1569be"
+    },
+    {
+      "file": "0002-box-name-ownership.patch",
+      "sha256": "1a6b7ff31bf5ca930427933b43ef27e2297a57b596eb56355a5f332da5b1c84c"
     }
   ],
-  "prepared_sha256": "2dd097f85d1782b66de324e5077f0b78bfe8c49b1dd9c42e4113af7f76ce9b2f"
+  "prepared_sha256": "9504f54de5ccff27009619cb4265d4e45e84e998b79eac653a1bfdf315885dcc"
 }

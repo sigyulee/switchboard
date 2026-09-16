@@ -2,7 +2,9 @@ import BridgeCore
 import CoreAudio
 import Darwin
 import Foundation
+import Observation
 import RecorderKit
+import Synchronization
 
 private struct NavigationCheckFailure: Error, CustomStringConvertible {
     let description: String
@@ -15,6 +17,7 @@ private func require(_ condition: @autoclosure () throws -> Bool, _ message: Str
 @main @MainActor struct NavigationChecks {
     static func main() async {
         let checks: [(String, @MainActor () async throws -> Void)] = [
+            ("waveform ticks do not invalidate capture error observers", waveformErrorObservation),
             ("monitoring changes preserve discovery and remember the selected device", monitoringChanges),
             ("monitoring fallback preserves the selected device across reconnect", monitoringReconnect),
             ("fresh installation confirms a folder before audio setup and remembers it", firstRunFolder),
@@ -45,6 +48,31 @@ private func require(_ condition: @autoclosure () throws -> Bool, _ message: Str
         if failures > 0 { exit(1) }
         print(
             "\(checks.count) library navigation checks passed; no audio or permission requests were started.")
+    }
+
+    private static func waveformErrorObservation() async throws {
+        try await withFreshModel { model, _, _ in
+            let changes = Mutex(0)
+            for tick in 1...100 {
+                withObservationTracking {
+                    _ = model.callerCaptureError
+                    _ = model.agentCaptureError
+                } onChange: {
+                    changes.withLock { $0 += 1 }
+                }
+                model.audio.callerLevel = Float(tick) / 100
+            }
+            let updates = changes.withLock { $0 }
+            try require(updates == 0, "Waveform ticks invalidated capture error observers \(updates) times")
+            let errors = Mutex(0)
+            withObservationTracking {
+                _ = model.callerCaptureError
+            } onChange: {
+                errors.withLock { $0 += 1 }
+            }
+            model.audio.callerError = .detail("Capture stopped")
+            try require(errors.withLock { $0 } == 1, "A capture error did not invalidate its observer")
+        }
     }
 
     private static func monitoringChanges() async throws {

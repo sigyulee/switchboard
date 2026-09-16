@@ -86,6 +86,7 @@ extension AppModel {
                 sessionSaveTask = nil
             }
             do {
+                await storedProcessing.pause()
                 await transcript.finishForSave(session: session)
                 if let directory = try await session.discard() {
                     try FileManager.default.trashItem(at: directory, resultingItemURL: nil)

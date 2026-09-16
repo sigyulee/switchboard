@@ -16,7 +16,9 @@ struct ListeningView: View {
                         Text(strings(.monitorDisconnected, model.preferredOutputName)).tag(model.preferredUID)
                     }
                     ForEach(model.outputs) { device in Text(device.name).tag(device.uid) }
-                }.labelsHidden().frame(maxWidth: 220)
+                }
+                .labelsHidden()
+                .frame(maxWidth: 220)
             }
             HStack(spacing: 24) {
                 volume(strings(.monitorCaller), value: $model.callerVolume)
@@ -26,6 +28,7 @@ struct ListeningView: View {
                 HStack(alignment: .top, spacing: 12) {
                     Toggle(strings(.monitorFallback, model.preferredOutputName), isOn: $model.speakerFallback)
                         .toggleStyle(.switch).controlSize(.mini).font(typography.body)
+                        .accessibilityLabel(strings(.monitorFallback, model.preferredOutputName))
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 0)
                 }

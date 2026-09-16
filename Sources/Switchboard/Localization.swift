@@ -88,6 +88,7 @@ struct AppStrings: Sendable {
                 case .invalidSampleRate: .errorSampleRate
                 case .invalidTimeline: .errorTimeline
                 case .invalidSegment: .errorSegment
+                case .invalidFile: .errorSessionData
                 }
             return self(key)
         }

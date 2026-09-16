@@ -30,7 +30,7 @@ audio_objects = sorted((binary / 'AudioRealtime.build').glob('*.c.o'))
 if not audio_objects:
     sys.exit(f'Missing AudioRealtime build artifacts; build BridgeChecks in {sys.argv[1]} first.')
 sources = [
-    'AppModel', 'AppStorageDirectories', 'OperationIssue', 'AppTypography', 'AppAudioTap', 'ApplicationCatalog', 'AudioEndpoint', 'AudioPipeline',
+    'AppModel', 'AppStorageDirectories', 'OperationIssue', 'AppTypography', 'AccessibilitySupport', 'AppAudioTap', 'ApplicationCatalog', 'AudioEndpoint', 'AudioPipeline',
     'CallerRouteObserver', 'CapturePermissionRequest', 'DefaultInputLease', 'DeviceCatalog',
     'LegacyInstallation', 'Localization', 'MicrophoneAccess', 'PlaybackController', 'PrivilegedInstaller',
     'ProcessTapConfiguration', 'SessionActions', 'SessionController', 'StoredProcessingController',

@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 PUBLIC_DIRECTORIES = ("Sources", "Tests", "Installer", "scripts", "docs", ".github")
 PUBLIC_ROOT_FILES = (
     "LICENSE", "NOTICE.md", "VERSION",
-    "README.md", "SECURITY.md", "Package.swift", ".gitignore", ".gitattributes", ".swift-format", ".editorconfig",
+    "README.md", "CHANGELOG.md", "SECURITY.md", "Package.swift", ".gitignore", ".gitattributes", ".swift-format", ".editorconfig",
 )
 TEXT_SUFFIXES = {
     ".c", ".h", ".swift", ".py", ".sh", ".md", ".txt", ".json", ".toml",

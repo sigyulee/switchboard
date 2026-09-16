@@ -13,6 +13,7 @@ import RecorderKit
     let session: SessionController
     let transcript: TranscriptController
     let storedProcessing = StoredProcessingController()
+    let accessibilityAnnouncer = AccessibilityAnnouncer()
     private var sessionStartTask: Task<Void, Never>?
     private var pipeline: AudioPipeline { session.pipeline }
     private let callerRouteObserver = CallerRouteObserver()
@@ -20,9 +21,6 @@ import RecorderKit
     let defaults: UserDefaults
     var language: ApplicationLanguage? {
         didSet { if !preview, let language { language.save(in: defaults) } }
-    }
-    var textSize: AppTextSize {
-        didSet { if !preview { defaults.set(textSize.rawValue, forKey: "interfaceTextSize") } }
     }
     var librarySidebarWidth: Double {
         didSet {
@@ -42,7 +40,14 @@ import RecorderKit
     private let libraryWork = AsyncSerialQueue(label: "com.switchboard.main.library", qos: .utility)
     private var refreshIndex = 0
     var devices: [AudioDevice] = []
-    var audio = PipelineSnapshot()
+    var audio = PipelineSnapshot() {
+        didSet {
+            if callerCaptureError != audio.callerError { callerCaptureError = audio.callerError }
+            if agentCaptureError != audio.agentError { agentCaptureError = audio.agentError }
+        }
+    }
+    private(set) var callerCaptureError: AppFailure?
+    private(set) var agentCaptureError: AppFailure?
     var callerRunning = false
     var agentRunning = false
     var suspended: Bool { session.paused }
@@ -125,14 +130,16 @@ import RecorderKit
     var canChangeRecordingFolder: Bool {
         libraryAccess.canChangeFolder && !session.active && !recordingFolderBusy
     }
-    func canEdit(_ item: RecordingItem) -> Bool { libraryAccess.canEdit(item.directory) }
+    func canEdit(_ item: RecordingItem) -> Bool {
+        libraryAccess.canEdit(item.directory) && !storedProcessing.isWriting(item.id)
+    }
     func canRecover(_ item: RecordingItem) -> Bool {
         libraryAccess.canRecover(item.directory, status: item.manifest.status)
     }
     func canStartRecovery(_ item: RecordingItem) -> Bool {
         libraryAccess.canRecover(
             item.directory, status: item.manifest.status,
-            busy: exportBusy || libraryMutationTask != nil)
+            busy: exportBusy || libraryMutationTask != nil || storedProcessing.isWriting(item.id))
     }
     var selectedItem: RecordingItem? { recordings.first { $0.id == selectedRecordingID } }
     var preferredDevice: AudioDevice? { outputs.first { $0.uid == preferredUID } }
@@ -165,8 +172,6 @@ import RecorderKit
                 "Switchboard/Drafts", isDirectory: true))
         lease = DefaultInputLease(defaults: defaults)
         language = ApplicationLanguage.saved(in: defaults)
-        textSize =
-            defaults.string(forKey: "interfaceTextSize").flatMap(AppTextSize.init(rawValue:)) ?? .larger
         let storedWidth = defaults.double(forKey: "librarySidebarWidth")
         librarySidebarWidth = storedWidth.isFinite && (280...420).contains(storedWidth) ? storedWidth : 320
         preferredUID = defaults.string(forKey: "monitorUID") ?? ""
@@ -277,10 +282,6 @@ import RecorderKit
                 if refreshIndex.isMultiple(of: 10) {
                     refresh()
                     session.checkpoint()
-                }
-                if let error = storedProcessing.error {
-                    errorMessage = strings.error(error)
-                    storedProcessing.error = nil
                 }
                 if let error = session.error {
                     errorMessage = strings.error(error)

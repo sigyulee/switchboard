@@ -95,7 +95,7 @@ extension AppModel {
     }
     func canRenameDraft(_ draft: StoredSession) -> Bool {
         !preview && !session.active && !starting && !endingSession && !session.busy
-            && !exportBusy && libraryMutationTask == nil
+            && !exportBusy && libraryMutationTask == nil && !storedProcessing.isWriting(draft.manifest.id)
     }
     func renameDraft(_ draft: StoredSession) {
         guard canRenameDraft(draft) else { return }
@@ -201,6 +201,13 @@ extension AppModel {
 }
 
 extension AppModel {
+    func processStored(
+        _ item: RecordingItem, mode: StoredTranscriptMode, configuration: TranscriptConfiguration
+    ) {
+        guard !preview, !session.active, !starting, !endingSession, libraryMutationTask == nil, !exportBusy
+        else { return }
+        storedProcessing.start(item, mode: mode, configuration: configuration)
+    }
     func continueProcessing(_ item: RecordingItem) {
         guard !preview, !session.active, !starting, !endingSession, libraryMutationTask == nil else { return }
         storedProcessing.start(item)

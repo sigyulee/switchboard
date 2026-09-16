@@ -40,10 +40,83 @@ func expectThrows(_ operation: () throws -> Void, file: StaticString = #filePath
         let callerRoutes = CallerRouteChecks()
         let replacement = SessionReplacementChecks()
         let stored = StoredTranscriptChecks()
+        let reprocessing = StoredReprocessingChecks()
         let directRecordings = DirectRecordingChecks()
         let captureSelection = CaptureSelectionChecks()
         let transcriptReview = TranscriptReviewChecks()
         let checks: [(String, () async throws -> Void)] = [
+            (
+                "recording metadata rejects oversized and linked inputs",
+                { try validation.manifestInputsAreBoundedAndDoNotFollowLinks() }
+            ),
+            (
+                "context translation preserves entries and revises only the recent window",
+                { try stored.contextualTranslationKeepsTimelineAndRevisesOnlyRecentEntries() }
+            ),
+            (
+                "context translation rejects outputs that cannot map back to entries",
+                { try stored.contextualTranslationRejectsAmbiguousEngineOutput() }
+            ),
+            (
+                "context translation carries invisible entry ranges through one natural paragraph",
+                { try stored.contextualTranslationCarriesInvisibleEntryRanges() }
+            ),
+            (
+                "context translation uses prior entries from the matching source language",
+                { try stored.contextualTranslationUsesOnlyPriorEntriesFromTheSameSourceLanguage() }
+            ),
+            (
+                "replaced recording selection cannot create a candidate",
+                reprocessing.replacedSelectionCannotCreateWorkForAnotherRecording
+            ),
+            (
+                "reprocessing refuses the published journal as output",
+                reprocessing.reprocessingCannotUseThePublishedJournalAsItsDestination
+            ),
+            (
+                "unfinished recording cannot start saved reprocessing",
+                reprocessing.unfinishedRecordingCannotStartReprocessing
+            ),
+            (
+                "copied package restores pending candidate independently",
+                reprocessing.copiedPackageRestoresPendingReviewWithoutReprocessingAudio
+            ),
+            (
+                "unavailable saved-audio engine keeps failed candidate and published text",
+                reprocessing.unavailableEngineLeavesFailedCandidateAndCurrentTextIntact
+            ),
+            (
+                "published candidate finishes cleanup after interrupted apply",
+                reprocessing.publishedCandidateCanFinishCleanupAfterRestart
+            ),
+            (
+                "old job cannot publish a replacement candidate",
+                reprocessing.replacedCandidateCannotBeAppliedByThePreviousJob
+            ),
+            (
+                "cancelled stored job never becomes ready for review",
+                reprocessing.cancelledJobDoesNotBecomeReviewReady
+            ),
+            (
+                "Record Only stages coverage and restores paused progress",
+                reprocessing.stagesRecordOnlyCoverageAndRestoresPausedWork
+            ),
+            (
+                "remaining preserves final text and language changes restart full coverage",
+                reprocessing.remainingKeepsFinalTextAndLanguageChangeRestartsFullCoverage
+            ),
+            (
+                "translation reviews before apply and preserves timing",
+                reprocessing.translationReviewsBeforeApplyAndPreservesTiming
+            ),
+            (
+                "apply refuses concurrently changed text",
+                reprocessing.refusesChangedPublicationAndKeepsCandidate
+            ),
+            (
+                "missing audio preserves text and translation needs no PCM",
+                reprocessing.missingAudioPreservesTextAndTranslationNeedsNoPCM
+            ),
             (
                 "renaming keeps both stored names and preserves session history and payloads",
                 rename.renameUpdatesStoredNamesAndPreservesSessionHistoryAndPayloads

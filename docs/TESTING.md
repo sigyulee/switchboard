@@ -57,3 +57,23 @@ a separate `.build/thread-sanitizer` directory.
 | Library folders | Default and explicitly added folders are listed; choosing another save destination does not register its folder. |
 | Transcript persistence | Final text, translations, language settings, and gaps survive reopen; timestamp navigation and UTF-8 export preserve both speakers. |
 | Long sessions | Check memory use, source alignment, missing frames, and audible discontinuities over an extended call. |
+
+## Accessibility scenarios
+
+Run the core tasks on a physical Mac with each relevant assistive technology or
+setting enabled. Automated checks and Accessibility Inspector are supporting
+evidence; they do not replace the task runs.
+
+| Scenario | Expected behavior |
+| --- | --- |
+| VoiceOver with Screen Curtain | First run, setup, session control, transcript navigation, recording search, playback, export, and saved transcript processing can be completed without looking at the screen. |
+| Full Keyboard Access | Every action has a predictable focus order and visible local focus indicator; sheets and popovers restore focus to their trigger when dismissed. |
+| Voice Control | Show Names identifies every actionable control with a stable, localized name. |
+| Switch Control | Scanning reaches every required action without pointer-only or hover-only interactions. |
+| Muted output | Caller and Agent identity, input state, transcript status, errors, and required recovery actions remain visible. |
+| Largest macOS text | Content reflows without clipping, overlap, hidden controls, or horizontal scrolling in task forms. |
+| Differentiate Without Color | Ready, inactive, progress, warning, and error states remain distinct through symbols and text. |
+| Increase Contrast | Focus, selection, dividers, and control boundaries remain perceivable in light and dark appearances. |
+| Reduce Motion | Nonessential focus, disclosure, and latest-message transitions become immediate. |
+| Reduce Transparency | Floating and split-control surfaces use opaque system backgrounds. |
+| Accessibility Inspector | The main window and every sheet have no unlabeled action, invalid role/value, clipped accessibility text, or illogical reading order. |

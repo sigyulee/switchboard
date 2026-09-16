@@ -7,7 +7,7 @@ import TranscriptKit
 struct TranscriptReviewChecks {
     func fifoMetadataIsRejectedWithoutBlocking() async throws {
         for metadata in ["session.json", "manifest.json", "transcript.json"] {
-            for mode in ["open", "commit"] {
+            for mode in ["open", "commit"] + (metadata == "manifest.json" ? ["library"] : []) {
                 let root = try temporaryRoot()
                 defer { try? FileManager.default.removeItem(at: root) }
                 let child = Process()
@@ -50,7 +50,7 @@ struct TranscriptReviewChecks {
         do {
             guard CommandLine.arguments.count == 4,
                 ["session.json", "manifest.json", "transcript.json"].contains(CommandLine.arguments[2]),
-                ["open", "commit"].contains(CommandLine.arguments[3]),
+                ["open", "commit", "library"].contains(CommandLine.arguments[3]),
                 let path = ProcessInfo.processInfo.environment["SWITCHBOARD_FIFO_TEST_ROOT"]
             else { throw CheckFailure(description: "invalid FIFO probe arguments") }
             let root = URL(fileURLWithPath: path, isDirectory: true)
@@ -63,7 +63,14 @@ struct TranscriptReviewChecks {
                 try FileManager.default.contentsOfDirectory(atPath: root.path).isEmpty
             else { throw CheckFailure(description: "FIFO fixture is not a fresh owned temporary directory") }
             let metadata = CommandLine.arguments[2]
-            let fifo = root.appendingPathComponent(metadata)
+            let directory: URL
+            if CommandLine.arguments[3] == "library" {
+                directory = root.appendingPathComponent("Fixture.mihrecording")
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+            } else {
+                directory = root
+            }
+            let fifo = directory.appendingPathComponent(metadata)
             let sessionID = UUID()
             var journal: TranscriptJournal?
             var token: TranscriptSessionToken?
@@ -88,6 +95,8 @@ struct TranscriptReviewChecks {
                         TranscriptEntry(
                             side: .caller, startFrame: 1, endFrame: 2, original: "Later", isFinal: true),
                         token: token)
+                } else if CommandLine.arguments[3] == "library" {
+                    _ = try RecordingLibrary.item(at: directory)
                 } else {
                     _ = try TranscriptJournal(sessionID: sessionID, directory: root)
                 }

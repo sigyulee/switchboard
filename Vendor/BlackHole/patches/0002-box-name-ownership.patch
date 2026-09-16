@@ -1,0 +1,15 @@
+--- a/BlackHole.c
++++ b/BlackHole.c
+@@ -1917,11 +1917,11 @@
+ 			FailWithAction(inDataSize < sizeof(CFStringRef), theAnswer = kAudioHardwareBadPropertySizeError, Done, "BlackHole_GetBoxPropertyData: not enough space for the return value of kAudioObjectPropertyManufacturer for the box");
+ 			pthread_mutex_lock(&gPlugIn_StateMutex);
+ 			*((CFStringRef*)outData) = gBox_Name;
+-			pthread_mutex_unlock(&gPlugIn_StateMutex);
+ 			if(*((CFStringRef*)outData) != NULL)
+ 			{
+ 				CFRetain(*((CFStringRef*)outData));
+ 			}
++			pthread_mutex_unlock(&gPlugIn_StateMutex);
+ 			*outDataSize = sizeof(CFStringRef);
+ 			break;
+ 			

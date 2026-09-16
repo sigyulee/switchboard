@@ -29,7 +29,8 @@ private struct RecordingInformation: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Text(item.manifest.title).font(typography.section)
+                Text(item.manifest.title).font(typography.section).accessibilityAddTraits(.isHeader)
+                    .accessibilityInitialFocus()
                     .fixedSize(horizontal: false, vertical: true)
                 VStack(alignment: .leading, spacing: 8) {
                     Text(strings(.libraryRecordedAt)).font(typography.caption).foregroundStyle(.secondary)
@@ -42,7 +43,7 @@ private struct RecordingInformation: View {
                     LabeledContent(strings(.sessionDuration), value: durationText(item.manifest.duration))
                 }
                 Divider()
-                Text(strings(.libraryMissingAudio)).font(typography.section)
+                Text(strings(.libraryMissingAudio)).font(typography.section).accessibilityAddTraits(.isHeader)
                 if let summaries {
                     if summaries.allSatisfy({ $0.intervalCount == 0 }) {
                         Text(strings(.libraryNoMissingAudio)).foregroundStyle(.secondary)
@@ -65,7 +66,7 @@ private struct RecordingInformation: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }.font(typography.body).textSelection(.enabled).padding(16)
-        }.frame(width: typography.textSize == .largest ? 400 : 360).frame(maxHeight: 520)
+        }.frame(minWidth: 360, idealWidth: 400, maxWidth: 560).frame(maxHeight: 620)
             .fixedSize(horizontal: false, vertical: true)
             .onChange(of: item.manifest, initial: true) {
                 do {

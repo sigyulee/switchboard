@@ -93,7 +93,7 @@ import SwiftUI
             }
             .environment(\.appStrings, model.strings)
             .environment(\.locale, model.strings.locale)
-            .environment(\.appTypography, AppTypography(textSize: model.textSize))
+            .environment(\.appTypography, AppTypography())
         }
     }
 }

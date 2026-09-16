@@ -10,7 +10,7 @@ struct PlaybackButton: View {
         SplitActionButton(
             title: strings(preparing ? .libraryPreparing : source == .mix ? .libraryPlay : source.title),
             systemImage: "play.fill", menuLabel: strings(.librarySources),
-            action: { play(source) },
+            menuValue: strings(source.title), action: { play(source) },
             options: PlaybackSource.allCases.map { choice in
                 SplitMenuOption(
                     id: choice.title.rawValue, title: strings(choice.title),

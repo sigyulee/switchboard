@@ -6,11 +6,14 @@ struct TranscriptMessages: View {
     @Environment(\.appTypography) private var typography
     @Environment(\.appStrings) private var strings
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorSchemeContrast) private var contrast
     @Environment(AppFindController.self) private var findController
     let transcriptID: UUID
     let entries: [TranscriptEntry]
     var seek: ((Double) -> Void)? = nil
     var isProcessing = false
+    var announcer: AccessibilityAnnouncer? = nil
+    var announcesFinalEntries = false
     @ViewState private var follow = TranscriptScrollFollow()
     @ViewState private var latestRequest = UUID()
     @ViewState private var scrollPhase: ScrollPhase = .idle
@@ -26,6 +29,8 @@ struct TranscriptMessages: View {
     @ViewState private var isSearching = false
     @ViewState private var searchGeneration = UUID()
     @ViewState private var scrollRequest: ScrollRequest?
+    @ViewState private var announcementTracker = TranscriptAnnouncementTracker()
+    @ViewState private var announcementsInitialized = false
     @ViewState private var rangeRevealID: UUID?
     @FocusState private var searchFocused: Bool
     @FocusState private var contentFocused: Bool
@@ -78,6 +83,21 @@ struct TranscriptMessages: View {
         )
         .task(id: SearchInput(entries: entries, query: query, visible: searchVisible)) {
             await updateSearch()
+        }
+        .onChange(of: entries, initial: true) { _, entries in
+            guard announcesFinalEntries, let announcer else { return }
+            if !announcementsInitialized {
+                announcementTracker = TranscriptAnnouncementTracker(existing: entries)
+                announcementsInitialized = true
+                return
+            }
+            for entry in announcementTracker.newlyFinalized(in: entries) {
+                let speaker = entry.side == .agent ? "Agent" : strings(.roleCaller)
+                announcer.announce(
+                    id: "transcript.final.\(entry.id.uuidString)",
+                    message: strings(.accessibilityTranscriptFinal, speaker, entry.original),
+                    priority: .low)
+            }
         }
         .onDisappear {
             searchGeneration = UUID()
@@ -132,6 +152,13 @@ struct TranscriptMessages: View {
                 }
             }
             .focusable().focusEffectDisabled().focused($contentFocused)
+            .overlay {
+                if contentFocused {
+                    RoundedRectangle(cornerRadius: 8).strokeBorder(
+                        Color.accentColor, lineWidth: contrast == .increased ? 3 : 2
+                    ).padding(2)
+                }
+            }
             .accessibilityLabel(strings(.libraryTranscript))
             .onScrollGeometryChange(for: ScrollMetrics.self) { geometry in
                 ScrollMetrics(
@@ -337,23 +364,30 @@ struct TranscriptMessage: View {
     var selectedMatch: TranscriptSearchMatch?
     var revealID: UUID?
     var focus: () -> Void = {}
+
+    private var seconds: Double { Double(entry.startFrame) / 48_000 }
+    private var timestamp: String { durationText(seconds) }
+    private var speaker: String { entry.side == .agent ? "Agent" : strings(.roleCaller) }
+    private var summary: TranscriptAccessibilitySummary {
+        TranscriptAccessibilitySummary(
+            speaker: speaker, timestamp: timestamp, original: entry.original,
+            translation: entry.translation, translationLabel: strings(.accessibilityTranslation),
+            partialLabel: entry.isFinal ? nil : strings(.accessibilityPartial))
+    }
+
     var body: some View {
         HStack {
             if entry.side == .agent { Spacer(minLength: 32) }
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
-                    Text(entry.side == .agent ? "Agent" : strings(.roleCaller)).font(
-                        typography.caption.weight(.semibold))
+                    Text(speaker).font(typography.caption.weight(.semibold))
                     if let seek {
-                        Button(durationText(Double(entry.startFrame) / 48_000)) {
-                            seek(Double(entry.startFrame) / 48_000)
-                        }
-                        .buttonStyle(.plain).font(typography.caption.monospacedDigit()).foregroundStyle(
-                            .secondary)
+                        Button(timestamp) { seek(seconds) }
+                            .buttonStyle(.plain).font(typography.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
                     } else {
-                        Text(durationText(Double(entry.startFrame) / 48_000)).font(
-                            typography.caption.monospacedDigit()
-                        ).foregroundStyle(.secondary)
+                        Text(timestamp).font(typography.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
                     }
                 }
                 messageText(entry.original, field: .original, secondary: !entry.isFinal)
@@ -372,12 +406,18 @@ struct TranscriptMessage: View {
             )
             .frame(maxWidth: 500, alignment: entry.side == .agent ? .trailing : .leading)
             if entry.side == .caller { Spacer(minLength: 32) }
-        }.frame(maxWidth: .infinity)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(summary.label)
+        .modifier(
+            TranscriptSeekAccessibilityAction(
+                label: strings(.accessibilitySeekFrom, timestamp), seek: seek, seconds: seconds))
     }
 
-    @ViewBuilder private func messageText(_ text: String, field: TranscriptSearchMatch.Field, secondary: Bool)
-        -> some View
-    {
+    @ViewBuilder private func messageText(
+        _ text: String, field: TranscriptSearchMatch.Field, secondary: Bool
+    ) -> some View {
         let fieldMatches = matches.filter { $0.field == field }
         if fieldMatches.isEmpty {
             Text(text).font(typography.body).foregroundStyle(secondary ? .secondary : .primary)
@@ -385,19 +425,33 @@ struct TranscriptMessage: View {
             let current = selectedMatch.flatMap { $0.entryID == entry.id && $0.field == field ? $0 : nil }
             TranscriptSearchText(
                 text: text,
-                font: .systemFont(
-                    ofSize: NSFont.preferredFont(forTextStyle: .body).pointSize * typography.textSize.scale),
+                font: .preferredFont(forTextStyle: .body),
                 secondary: secondary, matches: fieldMatches, selected: current,
                 revealID: current == nil ? nil : revealID, focus: focus)
         }
     }
+}
 
+private struct TranscriptSeekAccessibilityAction: ViewModifier {
+    let label: String
+    let seek: ((Double) -> Void)?
+    let seconds: Double
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if let seek {
+            content.accessibilityAction(named: Text(label)) { seek(seconds) }
+        } else {
+            content
+        }
+    }
 }
 
 private struct TranscriptLatestButton: View {
     @Environment(\.appTypography) private var typography
     @Environment(\.appStrings) private var strings
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var contrast
     let isProcessing: Bool
     let action: () -> Void
 
@@ -435,11 +489,19 @@ private struct TranscriptLatestButton: View {
             }
             .font(typography.caption.weight(.medium))
             .foregroundStyle(.secondary)
-            .frame(width: 32, height: 32)
+            .frame(width: typography.controlSide, height: typography.controlSide)
             .hoverBackground(cornerRadius: 16)
-            .background(.regularMaterial, in: Circle())
-            .overlay(Circle().strokeBorder(.primary.opacity(0.08)))
-            .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
+            .background(
+                reduceTransparency
+                    ? AnyShapeStyle(Color(nsColor: .controlBackgroundColor))
+                    : AnyShapeStyle(.regularMaterial), in: Circle()
+            )
+            .overlay(
+                Circle().strokeBorder(
+                    .primary.opacity(contrast == .increased ? 0.35 : 0.12),
+                    lineWidth: contrast == .increased ? 2 : 1)
+            )
+            .shadow(color: reduceTransparency ? .clear : .black.opacity(0.05), radius: 2, y: 1)
             .contentShape(Circle())
         }
         .buttonStyle(.plain).accessibilityLabel(label).help(label)

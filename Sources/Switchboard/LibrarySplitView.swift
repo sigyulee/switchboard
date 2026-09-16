@@ -1,6 +1,13 @@
 import AppKit
 import SwiftUI
 
+enum LibraryRowFocusPresentation {
+    static func lineWidth(selected: Bool, listFocused: Bool, increasedContrast: Bool) -> CGFloat {
+        guard selected, listFocused else { return 0 }
+        return increasedContrast ? 3 : 2
+    }
+}
+
 /// Keeps the library divider independent of the selected recording's intrinsic content size.
 struct LibrarySplitView<Sidebar: View, Detail: View>: NSViewRepresentable {
     @Binding private var sidebarWidth: Double

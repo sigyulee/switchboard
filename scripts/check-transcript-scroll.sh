@@ -13,7 +13,7 @@ binary=Path('.build/arm64-apple-macosx') / sys.argv[1]
 output=Path(sys.argv[2]) / 'Checks'
 objects=sorted((binary/'BridgeCore.build').glob('*.swift.o'))
 if not objects: sys.exit('Build BridgeChecks first.')
-sources=['AppTypography','TextKey','ViewState','ControlStyles','AppFindController',
+sources=['AppTypography','AccessibilitySupport','TextKey','ViewState','ControlStyles','AppFindController',
          'TranscriptScrollFollow','TranscriptTailFrame','TranscriptSearch','TranscriptSearchText','TranscriptMessages']
 subprocess.run(['xcrun','swiftc','-swift-version','6','-parse-as-library','-target','arm64-apple-macosx26.0',
  '-module-cache-path','.build/scroll-layout-cache','-I',str(binary/'Modules'),
