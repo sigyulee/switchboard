@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.2 beta — 2026-09-16
+
+- Protect PCM converter input ownership when its sendable callback is invoked
+  concurrently.
+- Keep connection setup instructions readable on narrow screens.
+
 ## 1.3.1 beta — 2026-09-16
 
 - Improve on-device translation with recent conversation context on macOS 26.4

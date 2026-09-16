@@ -46,6 +46,10 @@ func expectThrows(_ operation: () throws -> Void, file: StaticString = #filePath
         let transcriptReview = TranscriptReviewChecks()
         let checks: [(String, () async throws -> Void)] = [
             (
+                "converter input ownership permits exactly one concurrent consumer",
+                { try validation.converterInputIsSuppliedExactlyOnce() }
+            ),
+            (
                 "recording metadata rejects oversized and linked inputs",
                 { try validation.manifestInputsAreBoundedAndDoNotFollowLinks() }
             ),

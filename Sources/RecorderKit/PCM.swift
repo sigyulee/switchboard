@@ -61,6 +61,39 @@ public enum PCM {
     }
 }
 
+/// Supplies one immutable PCM buffer to an AVAudioConverter input callback.
+/// AVAudioPCMBuffer is not Sendable, so this wrapper owns its reference and
+/// serializes the only mutable state before crossing the @Sendable boundary.
+public final class PCMConverterInput: @unchecked Sendable {
+    private let buffer: AVAudioPCMBuffer
+    private let lock = NSLock()
+    private var supplied = false
+
+    public init(_ buffer: AVAudioPCMBuffer) {
+        self.buffer = buffer
+    }
+
+    public var wasSupplied: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return supplied
+    }
+
+    public func next(
+        status: UnsafeMutablePointer<AVAudioConverterInputStatus>
+    ) -> AVAudioBuffer? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !supplied else {
+            status.pointee = .noDataNow
+            return nil
+        }
+        supplied = true
+        status.pointee = .haveData
+        return buffer
+    }
+}
+
 public final class SampleConverter {
     private let sourceRate: Double
     private let targetRate: Double
@@ -91,16 +124,10 @@ public final class SampleConverter {
             let output = AVAudioPCMBuffer(
                 pcmFormat: try PCM.format(rate: targetRate), frameCapacity: capacity)
         else { throw MediaFailure.invalidBuffer }
-        var supplied = false
+        let converterInput = PCMConverterInput(input)
         var error: NSError?
         let status = converter.convert(to: output, error: &error) { _, state in
-            if supplied {
-                state.pointee = .noDataNow
-                return nil
-            }
-            supplied = true
-            state.pointee = .haveData
-            return input
+            converterInput.next(status: state)
         }
         if let error { throw error }
         if status == .error { throw MediaFailure.invalidBuffer }

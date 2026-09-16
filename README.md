@@ -73,12 +73,9 @@ bash scripts/build-dmg.sh
 2. Select the Agent and calling apps in Settings.
 3. Install the audio devices and allow microphone and system-audio access.
 4. Select these devices in the two apps:
-
-| App | Setting | Device |
-| --- | --- | --- |
-| Agent | Microphone | Switchboard → Agent |
-| Calling app | Speaker | Caller → Switchboard |
-| Calling app | Microphone | Agent → Caller |
+   - **Agent microphone:** Switchboard → Agent
+   - **Calling app speaker:** Caller → Switchboard
+   - **Calling app microphone:** Agent → Caller
 
 If the Agent app only offers **Default**, leave it selected. Switchboard selects
 the Mac's input when you start a session.

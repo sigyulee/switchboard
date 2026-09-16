@@ -104,21 +104,14 @@ actor TranscriptPCMConverter {
             emittedFrames = 0
         }
         sourceEnd = packet.endFrame
-        let input = try PCM.buffer(packet.samples)
+        let converterInput = PCMConverterInput(try PCM.buffer(packet.samples))
         let output = try outputBuffer()
-        var supplied = false
         var error: NSError?
         let status = converter.convert(to: output, error: &error) { _, state in
-            if supplied {
-                state.pointee = .noDataNow
-                return nil
-            }
-            supplied = true
-            state.pointee = .haveData
-            return input
+            converterInput.next(status: state)
         }
         if let error { throw error }
-        guard supplied, status == .inputRanDry,
+        guard converterInput.wasSupplied, status == .inputRanDry,
             Int64(output.frameLength) <= remainingFrames
         else { throw TranscriptFailure.invalidAudio }
         if let input = try emit(output) { result.append(input) }

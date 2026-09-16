@@ -68,6 +68,10 @@ jobs:
         run: |
           xcrun swift-format lint --strict --configuration .swift-format --recursive \
             Package.swift Sources Tests Installer
+      - name: Reject Swift compiler warnings
+        run: >-
+          bash scripts/swift.sh build --configuration release --target TranscriptKit
+          -Xswiftc -warnings-as-errors
       - name: Build release app and audio drivers
         run: bash scripts/build-app.sh release
       - name: Run Swift regression checks

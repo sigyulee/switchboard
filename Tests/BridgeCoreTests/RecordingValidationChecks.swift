@@ -1,9 +1,29 @@
 import AVFAudio
 import BridgeCore
+import Dispatch
 import Foundation
 import RecorderKit
+import Synchronization
 
 struct RecordingValidationChecks {
+    func converterInputIsSuppliedExactlyOnce() throws {
+        let input = PCMConverterInput(try PCM.buffer([0.25, -0.25]))
+        let accepted = Mutex(0)
+        let invalidStatuses = Mutex(0)
+        DispatchQueue.concurrentPerform(iterations: 64) { _ in
+            var status = AVAudioConverterInputStatus.noDataNow
+            if input.next(status: &status) == nil {
+                if status != .noDataNow { invalidStatuses.withLock { $0 += 1 } }
+            } else {
+                if status != .haveData { invalidStatuses.withLock { $0 += 1 } }
+                accepted.withLock { $0 += 1 }
+            }
+        }
+        try expect(accepted.withLock { $0 } == 1)
+        try expect(invalidStatuses.withLock { $0 } == 0)
+        try expect(input.wasSupplied)
+    }
+
     func nonFiniteAudioIsRejected() throws {
         let converter = try SampleConverter(from: 48_000)
         try expectThrows { _ = try converter.convert([.nan, 0]) }

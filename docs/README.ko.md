@@ -71,12 +71,9 @@ bash scripts/build-dmg.sh
 2. 설정에서 Agent 앱과 통화 앱을 선택합니다.
 3. 오디오 장치를 설치하고 마이크·시스템 오디오 접근을 허용합니다.
 4. 두 앱에서 다음 장치를 선택합니다.
-
-| 앱 | 설정 | 장치 |
-| --- | --- | --- |
-| Agent | 마이크 | Switchboard → Agent |
-| 통화 앱 | 스피커 | Caller → Switchboard |
-| 통화 앱 | 마이크 | Agent → Caller |
+   - **Agent 마이크:** Switchboard → Agent
+   - **통화 앱 스피커:** Caller → Switchboard
+   - **통화 앱 마이크:** Agent → Caller
 
 Agent 앱에서 **기본값(Default)**만 선택할 수 있다면 그대로 두세요.
 세션을 시작하면 Switchboard가 Mac의 입력 장치를 선택합니다.
