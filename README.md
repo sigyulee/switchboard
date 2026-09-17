@@ -45,6 +45,26 @@ speech arrives, recent translations may update to reflect that context.
 The original text, speaker, and timestamps stay attached to each entry. Earlier
 supported macOS versions translate entries individually.
 
+## Install a downloaded release
+
+Download the app ZIP from [Releases](https://github.com/sigyulee/switchboard/releases),
+unzip it, and move `Switchboard.app` to Applications.
+
+The app is ad-hoc signed and does not have a Developer ID signature or Apple
+notarization. If macOS blocks it, try opening it once, then choose **System Settings
+→ Privacy & Security → Open Anyway** and confirm **Open**.
+
+For a download from this repository that you trust, you can also remove this app's
+quarantine attribute in Terminal and open it:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Switchboard.app"
+open "/Applications/Switchboard.app"
+```
+
+If `xattr` reports Permission denied, retry that command with `sudo`, then open
+the app again. See [Apple's instructions](https://support.apple.com/en-us/102445).
+
 ## Build
 
 Use Xcode 26.4 or later to include contextual translation. Xcode 26.0.1 builds

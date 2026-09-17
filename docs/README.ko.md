@@ -43,6 +43,26 @@ macOS 26.4 이상에서는 최근 대화의 맥락을 번역에 반영합니다.
 최근 번역이 새 맥락에 맞게 갱신될 수 있습니다. 각 문장의 원문, 화자,
 타임스탬프는 유지됩니다. 이전 macOS 버전에서는 문장별로 번역합니다.
 
+## 다운로드한 앱 설치
+
+[릴리스](https://github.com/sigyulee/switchboard/releases)에서 앱 ZIP을 받아 압축을 풀고,
+`Switchboard.app`을 응용 프로그램 폴더로 옮깁니다.
+
+현재 앱은 ad-hoc 서명이며 Developer ID 서명과 Apple 공증은 없습니다. macOS가 실행을
+차단하면 앱을 한 번 열어본 뒤 **시스템 설정 → 개인정보 보호 및 보안 → 그래도 열기**를
+선택하고 **열기**를 확인합니다.
+
+이 저장소에서 받은 신뢰할 수 있는 앱이라면 터미널에서 해당 앱의 격리를 해제하고
+실행할 수도 있습니다.
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Switchboard.app"
+open "/Applications/Switchboard.app"
+```
+
+권한 오류가 나면 `xattr` 명령 앞에 `sudo`를 붙여 다시 실행한 뒤 앱을 엽니다.
+자세한 내용은 [Apple 안내](https://support.apple.com/en-us/102445)를 참고하세요.
+
 ## 빌드
 
 맥락 번역을 포함하려면 Xcode 26.4 이상을 사용하세요. Xcode 26.0.1로 빌드하면
